@@ -1,0 +1,213 @@
+﻿<Window x:Class="Dmc.Siemens.AlarmGenerator.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Dmc.Siemens.AlarmGenerator"
+        xmlns:i="clr-namespace:Dmc.Wpf.Interactivity;assembly=Dmc.Wpf"
+        xmlns:res="clr-namespace:Dmc.Siemens.AlarmGenerator.Resources"
+        xmlns:core="clr-namespace:System;assembly=mscorlib"
+        mc:Ignorable="d"
+        Title="Open Library Alarm Generation Tool"
+        Background="{StaticResource OpenLibraryLightGrayBrush}"
+        FontSize="14" MinWidth="400" MinHeight="400"
+        >
+    <Window.Resources>
+
+        <res:BooleanToUdtColorConverter x:Key="BooleanToUdtColorConverter" />
+        <res:EmptyUdtConverter x:Key="EmptyUdtConverter" />
+        <res:InvertVisibilityConverter x:Key="InvertVisibilityConverter" />
+        <res:DoubleMathConverter x:Key="DoubleMathConverter" />
+
+        <Style TargetType="TextBlock" x:Key="HeadingText">
+            <Setter Property="FontSize" Value="28" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+
+    </Window.Resources>
+    <Grid x:Name="MainWindowGrid">
+        <Grid.DataContext>
+            <local:MainWindowViewModel />
+        </Grid.DataContext>
+        <!-- regular window -->
+        <DockPanel>
+            <UniformGrid Height="80" DockPanel.Dock="Bottom" Rows="1">
+                <Button Content="Add Source" Command="{Binding TogglePopupVisibilityCommand}" Margin="10" FontSize="24" />
+                <Button Content="Export" Grid.Column="1" Command="{Binding ExportCommand}" Margin="10" IsEnabled="{Binding Path=ProjectManager.IsReadyForExport}" FontSize="24" />
+            </UniformGrid>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <DockPanel Margin="5">
+                    <TextBlock DockPanel.Dock="Top" Text="Data Blocks" Style="{StaticResource HeadingText}" />
+                    <DataGrid ItemsSource="{Binding Path=ProjectManager.DataBlocks}" SelectedItem="{Binding SelectedDataBlock, Mode=OneWayToSource}" AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False"
+                              i:EventCommand.EventName="GotFocus" i:EventCommand.Command="{Binding DataBlockFocusCommand}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Width="5*" Header="Name" Binding="{Binding Path=Name}" IsReadOnly="True" />
+                            <DataGridTextColumn Width="*" Header="Number">
+                                <DataGridTextColumn.Binding>
+                                    <Binding Path="Number" Mode="TwoWay" ValidatesOnExceptions="True">
+                                        <Binding.ValidationRules>
+                                            <res:DataBlockNumberValidationRule ValidationStep="ConvertedProposedValue" />
+                                        </Binding.ValidationRules>
+                                    </Binding>
+                                </DataGridTextColumn.Binding>
+                                <DataGridTextColumn.EditingElementStyle>
+                                    <Style TargetType="{x:Type TextBox}">
+                                        <Style.Triggers>
+                                            <Trigger Property="Validation.HasError" Value="True">
+                                                <Setter Property="DataGridCell.ToolTip" Value="Needs to be a positive integer" />
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.EditingElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                        <DataGrid.InputBindings>
+                            <KeyBinding Key="Delete" Command="{Binding DeleteCommand}" />
+                        </DataGrid.InputBindings>
+                    </DataGrid>
+                </DockPanel>
+                <DockPanel Grid.Column="1" Margin="5">
+                    <TextBlock DockPanel.Dock="Top" Text="User Data Types" Style="{StaticResource HeadingText}" />
+                    <ListBox ItemsSource="{Binding Path=ProjectManager.UdtNames}" SelectedItem="{Binding SelectedUdt, Converter={StaticResource EmptyUdtConverter}}"
+                             i:EventCommand.EventName="GotFocus" i:EventCommand.Command="{Binding UdtFocusCommand}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="ListBox">
+                                <TextBlock Text="{Binding Path=Key}" Foreground="{Binding Path=Value, Converter={StaticResource BooleanToUdtColorConverter}}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.InputBindings>
+                            <KeyBinding Key="Delete" Command="{Binding DeleteCommand}" />
+                        </ListBox.InputBindings>
+                    </ListBox>
+                </DockPanel>
+            </Grid>
+        </DockPanel>
+
+        <!-- overlay grid -->
+        <Grid Name="Overlay" Grid.ColumnSpan="2" Visibility="{Binding IsPopupVisible, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Hidden}" Panel.ZIndex="1" MouseDown="ResetPopup" Background="#7F000000"
+              i:EventCommand.EventName="MouseDown" i:EventCommand.Command="{Binding TogglePopupVisibilityCommand}">
+            <Grid.Resources>
+                <DoubleAnimation x:Key="BorderHeightAnimation" Duration="0:0:0.3" Storyboard.TargetName="PopupBorder" Storyboard.TargetProperty="Height">
+                    <DoubleAnimation.To>
+                        <MultiBinding Converter="{StaticResource DoubleMathConverter}" ConverterParameter="+">
+                            <Binding ElementName="ButtonDock" Path="Height" />
+                            <Binding ElementName="PathItemsControl" Path="ActualHeight" />
+                            <Binding ElementName="PopupBorder" Path="Padding.Top" />
+                            <Binding ElementName="PopupBorder" Path="Padding.Bottom" />
+                            <Binding ElementName="PopupBorder" Path="BorderThickness.Top" />
+                            <Binding ElementName="PopupBorder" Path="BorderThickness.Bottom" />
+                        </MultiBinding>
+                    </DoubleAnimation.To>
+                </DoubleAnimation>
+            </Grid.Resources>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Background="White" BorderBrush="Black" BorderThickness="2" CornerRadius="10" Grid.Column="1" Grid.Row="1" MouseDown="IgnoreMouseEvent"
+                    x:Name="PopupBorder" VerticalAlignment="Center" Height="84" MaxHeight="{Binding ElementName=MainWindowGrid, Path=ActualHeight}" Padding="5">
+                <DockPanel>
+                    <!-- Bottom Buttons -->
+                    <DockPanel x:Name="ButtonDock" DockPanel.Dock="Bottom" LastChildFill="False" Height="40" Visibility="Visible">
+                        <Button DockPanel.Dock="Right" Width="50" Command="{Binding ImportCommand}" Content="Ok" Margin="0,5,10,5"/>
+                        <Button x:Name="SwitchTextButton" DockPanel.Dock="Left" Width="120" Content="Swtich To Text" Margin="10,5,0,5" Visibility="Visible" Command="{Binding TogglePathSelectedCommand}">
+                            <Button.Triggers>
+                                <EventTrigger RoutedEvent="Button.Click">
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SwitchTextButton" Storyboard.TargetProperty="Visibility">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Collapsed}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PathInputGrid" Storyboard.TargetProperty="Visibility">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Collapsed}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <DoubleAnimation Duration="0:0:0.3" To="400" Storyboard.TargetName="PopupBorder" Storyboard.TargetProperty="Height" />
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="TextInputPanel" Storyboard.TargetProperty="Visibility">
+                                                <DiscreteObjectKeyFrame KeyTime="0:0:0.3" Value="{x:Static Visibility.Visible}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Button.Triggers>
+                        </Button>
+                        <Button DockPanel.Dock="Left" Width="120" Content="Switch To File" Margin="10,5,0,5" Command="{Binding TogglePathSelectedCommand}"
+                                Visibility="{Binding ElementName=SwitchTextButton, Path=Visibility, Converter={StaticResource InvertVisibilityConverter}, FallbackValue=Collapsed}">
+                            <Button.Triggers>
+                                <EventTrigger RoutedEvent="Button.Click">
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SwitchTextButton" Storyboard.TargetProperty="Visibility">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Visible}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="TextInputPanel" Storyboard.TargetProperty="Visibility">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Collapsed}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <StaticResourceExtension ResourceKey="BorderHeightAnimation" />
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PathInputGrid" Storyboard.TargetProperty="Visibility">
+                                                <DiscreteObjectKeyFrame KeyTime="0:0:0.3" Value="{x:Static Visibility.Visible}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Button.Triggers>
+                        </Button>
+                    </DockPanel>
+                    <Grid>
+                        <!-- Path Input -->
+                        <Grid x:Name="PathInputGrid" HorizontalAlignment="Stretch">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="40" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Button Grid.Column="1" Height="30" Content="..." Command="{Binding BrowseCommand}"/>
+                            <ItemsControl x:Name="PathItemsControl" ItemsSource="{Binding ImportPaths}" IsEnabled="False" BorderThickness="1" BorderBrush="Black"  Padding="2">
+                                <ItemsControl.Triggers>
+                                    <EventTrigger RoutedEvent="SizeChanged">
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <StaticResourceExtension ResourceKey="BorderHeightAnimation" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                </ItemsControl.Triggers>
+                            </ItemsControl>
+                        </Grid>
+                        <!-- Text Input -->
+                        <TextBox x:Name="TextInputPanel" Text="{Binding ImportString}" Visibility="Hidden" AcceptsReturn="True" AcceptsTab="True" VerticalScrollBarVisibility="Auto" />
+                    </Grid>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- error display -->
+        <Grid Grid.ColumnSpan="2" Visibility="{Binding IsErrorActive, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Hidden}" Panel.ZIndex="1" Background="#7F000000"
+              i:EventCommand.EventName="MouseDown" i:EventCommand.Command="{Binding AcknowledgeErrorCommand}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="3*" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Border Background="White" BorderBrush="Black" BorderThickness="2" CornerRadius="10" Grid.Column="1" Grid.Row="1" MouseDown="IgnoreMouseEvent"
+                    VerticalAlignment="Center" Height="200" MaxHeight="{Binding ElementName=MainWindowGrid, Path=ActualHeight}" Padding="5">
+                <DockPanel>
+                    <Button DockPanel.Dock="Bottom" Width="150" Height="40" Command="{Binding AcknowledgeErrorCommand}" Margin="10" Content="Acknowledge" />
+                    <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
